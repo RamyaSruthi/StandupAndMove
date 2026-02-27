@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Buddy",
+    "slug": "buddy-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "buddyapp",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#F8F7FF"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourname.buddyapp"
+    },
+    "android": {
+      "package": "com.yourname.buddyapp"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#6C63FF"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
