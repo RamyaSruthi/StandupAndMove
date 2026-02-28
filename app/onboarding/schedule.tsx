@@ -1,16 +1,42 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { requestPermissions, scheduleReminders } from "@/utils/notifications";
 
 const INTERVALS = [30, 45, 60, 90] as const;
 
 export default function ScheduleScreen() {
   const router = useRouter();
-  const { reminderInterval, setReminderInterval, setOnboardingComplete } =
-    useSettingsStore();
+  const {
+    buddyName,
+    reminderInterval,
+    activeHoursStart,
+    activeHoursEnd,
+    activeDays,
+    setReminderInterval,
+    setOnboardingComplete,
+  } = useSettingsStore();
 
-  const handleDone = () => {
+  const [loading, setLoading] = useState(false);
+
+  const handleDone = async () => {
+    setLoading(true);
     setOnboardingComplete();
+
+    const granted = await requestPermissions();
+    if (granted) {
+      await scheduleReminders({
+        buddyName,
+        reminderInterval,
+        activeHoursStart,
+        activeHoursEnd,
+        activeDays,
+        isDndEnabled: false,
+      });
+    }
+
+    setLoading(false);
     router.replace("/(tabs)");
   };
 
@@ -48,8 +74,15 @@ export default function ScheduleScreen() {
       <Pressable
         className="bg-primary w-full py-4 rounded-2xl items-center"
         onPress={handleDone}
+        disabled={loading}
       >
-        <Text className="text-white text-lg font-semibold">Start Moving!</Text>
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text className="text-white text-lg font-semibold">
+            Start Moving!
+          </Text>
+        )}
       </Pressable>
     </View>
   );
