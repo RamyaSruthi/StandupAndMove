@@ -1,5 +1,5 @@
 import { View, Text, Pressable, Animated } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useStatsStore } from "@/store/useStatsStore";
 import { useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,13 +7,13 @@ import BuddyCharacter from "@/components/BuddyCharacter";
 
 export default function CompleteScreen() {
   const router = useRouter();
+  const { steps } = useLocalSearchParams<{ steps: string }>();
+  const sessionSteps = parseInt(steps ?? "0");
+
   const { recordStandup, currentStreak, totalXP, totalStandups } =
     useStatsStore();
 
-  // Prevent double-recording if component re-renders
   const recorded = useRef(false);
-
-  // Entrance scale animation
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
@@ -41,9 +41,13 @@ export default function CompleteScreen() {
   return (
     <View className="flex-1 items-center justify-center bg-background px-6">
       <Animated.View
-        style={{ transform: [{ scale: scaleAnim }], opacity: opacityAnim, alignItems: "center", width: "100%" }}
+        style={{
+          transform: [{ scale: scaleAnim }],
+          opacity: opacityAnim,
+          alignItems: "center",
+          width: "100%",
+        }}
       >
-        {/* Header */}
         <Text className="text-4xl font-extrabold text-dark mb-1">
           Great job! 🎉
         </Text>
@@ -51,17 +55,11 @@ export default function CompleteScreen() {
           You completed a movement session
         </Text>
 
-        {/* Buddy in happy state */}
         <BuddyCharacter state="happy" size={200} />
 
         {/* Stats row */}
-        <View className="flex-row gap-3 mt-8 mb-10 w-full">
-          <StatCard
-            icon="flash"
-            value="+10 XP"
-            label="Earned"
-            color="#43C6AC"
-          />
+        <View className="flex-row gap-3 mt-8 mb-4 w-full">
+          <StatCard icon="flash" value="+10 XP" label="Earned" color="#43C6AC" />
           <StatCard
             icon="flame"
             value={String(currentStreak)}
@@ -76,7 +74,29 @@ export default function CompleteScreen() {
           />
         </View>
 
-        {/* Back to home */}
+        {/* Steps taken this session */}
+        {sessionSteps > 0 && (
+          <View
+            className="w-full flex-row items-center gap-3 rounded-2xl px-4 py-3 mb-6"
+            style={{
+              backgroundColor: "rgba(67,198,172,0.1)",
+              borderWidth: 1,
+              borderColor: "rgba(67,198,172,0.25)",
+            }}
+          >
+            <Ionicons name="footsteps" size={22} color="#43C6AC" />
+            <View>
+              <Text
+                className="text-lg font-extrabold"
+                style={{ color: "#43C6AC" }}
+              >
+                {sessionSteps.toLocaleString()} steps
+              </Text>
+              <Text className="text-xs text-gray-500">taken this session</Text>
+            </View>
+          </View>
+        )}
+
         <Pressable
           className="w-full py-4 rounded-2xl items-center"
           style={{ backgroundColor: "#6C63FF" }}

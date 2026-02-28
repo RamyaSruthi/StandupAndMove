@@ -1,19 +1,25 @@
 import { View, Text, Pressable } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Svg, Circle } from "react-native-svg";
+import { Pedometer } from "expo-sensors";
+import { Ionicons } from "@expo/vector-icons";
 import BuddyCharacter from "@/components/BuddyCharacter";
 
-const DURATION = 60;
 const RADIUS = 100;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export default function TimerScreen() {
   const router = useRouter();
-  const [secondsLeft, setSecondsLeft] = useState(DURATION);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { duration } = useLocalSearchParams<{ duration: string }>();
+  const DURATION = parseInt(duration ?? "60");
 
-  // Tick down every second
+  const [secondsLeft, setSecondsLeft] = useState(DURATION);
+  const [sessionSteps, setSessionSteps] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pedometerRef = useRef<ReturnType<typeof Pedometer.watchStepCount> | null>(null);
+
+  // Countdown
   useEffect(() => {
     intervalRef.current = setInterval(() => {
       setSecondsLeft((prev) => {
@@ -30,20 +36,43 @@ export default function TimerScreen() {
     };
   }, []);
 
-  // Navigate when timer reaches zero (must be outside state setter)
+  // Navigate when timer reaches zero
   useEffect(() => {
     if (secondsLeft === 0) {
-      router.replace("/complete");
+      navigate();
     }
   }, [secondsLeft]);
 
+  // Session step counter
+  useEffect(() => {
+    Pedometer.isAvailableAsync().then((available) => {
+      if (!available) return;
+      pedometerRef.current = Pedometer.watchStepCount((result) => {
+        setSessionSteps(result.steps);
+      });
+    });
+
+    return () => {
+      pedometerRef.current?.remove();
+    };
+  }, []);
+
+  const navigate = () => {
+    pedometerRef.current?.remove();
+    router.replace({
+      pathname: "/complete",
+      params: { steps: String(sessionSteps) },
+    });
+  };
+
   const handleFinishEarly = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    router.replace("/complete");
+    navigate();
   };
 
   const handleCancel = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
+    pedometerRef.current?.remove();
     router.back();
   };
 
@@ -53,8 +82,6 @@ export default function TimerScreen() {
 
   const progress = secondsLeft / DURATION;
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
-
-  // Ring colour shifts from purple → teal → pink as time runs out
   const ringColor =
     progress > 0.5 ? "#6C63FF" : progress > 0.25 ? "#43C6AC" : "#FF6584";
 
@@ -65,25 +92,23 @@ export default function TimerScreen() {
       </Text>
 
       {/* Circular progress ring with Buddy inside */}
-      <View style={{ width: 240, height: 240, alignItems: "center", justifyContent: "center", marginBottom: 40 }}>
+      <View
+        style={{
+          width: 240,
+          height: 240,
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 32,
+        }}
+      >
         <Svg width={240} height={240} style={{ position: "absolute" }}>
-          {/* Background ring */}
           <Circle
-            cx={120}
-            cy={120}
-            r={RADIUS}
-            fill="none"
-            stroke="#EEEEEE"
-            strokeWidth={12}
+            cx={120} cy={120} r={RADIUS}
+            fill="none" stroke="#EEEEEE" strokeWidth={12}
           />
-          {/* Progress ring */}
           <Circle
-            cx={120}
-            cy={120}
-            r={RADIUS}
-            fill="none"
-            stroke={ringColor}
-            strokeWidth={12}
+            cx={120} cy={120} r={RADIUS}
+            fill="none" stroke={ringColor} strokeWidth={12}
             strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={strokeDashoffset}
@@ -91,7 +116,6 @@ export default function TimerScreen() {
           />
         </Svg>
 
-        {/* Buddy + countdown inside ring */}
         <View className="items-center">
           <BuddyCharacter state="happy" size={140} />
           <Text
@@ -103,7 +127,19 @@ export default function TimerScreen() {
         </View>
       </View>
 
-      {/* Finish early */}
+      {/* Session steps */}
+      {sessionSteps > 0 && (
+        <View
+          className="flex-row items-center gap-2 rounded-full px-4 py-2 mb-6"
+          style={{ backgroundColor: "rgba(67,198,172,0.12)" }}
+        >
+          <Ionicons name="footsteps" size={16} color="#43C6AC" />
+          <Text className="text-sm font-semibold" style={{ color: "#43C6AC" }}>
+            {sessionSteps} steps so far
+          </Text>
+        </View>
+      )}
+
       <Pressable
         className="w-full py-4 rounded-2xl items-center mb-3"
         style={{ backgroundColor: "#6C63FF" }}
@@ -112,7 +148,6 @@ export default function TimerScreen() {
         <Text className="text-white text-lg font-semibold">Done Early ✓</Text>
       </Pressable>
 
-      {/* Cancel */}
       <Pressable onPress={handleCancel} className="py-2">
         <Text className="text-gray-400 text-sm">Cancel</Text>
       </Pressable>
