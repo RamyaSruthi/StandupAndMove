@@ -3,6 +3,7 @@ import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import { setupNotificationChannel } from "@/utils/notifications";
+import { useStatsStore } from "@/store/useStatsStore";
 import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
@@ -20,19 +21,17 @@ Notifications.setNotificationHandler({
 export default function RootLayout() {
   const router = useRouter();
   const responseListener = useRef<Notifications.Subscription | null>(null);
+  const setPendingReminder = useStatsStore((s) => s.setPendingReminder);
 
   useEffect(() => {
     SplashScreen.hideAsync();
     setupNotificationChannel();
 
-    // Tapping a notification opens the timer directly
+    // Tapping a notification lands on home with Buddy in "needs walk" state
     responseListener.current =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const screen =
-          response.notification.request.content.data?.screen;
-        if (screen === "timer") {
-          router.push("/timer");
-        }
+      Notifications.addNotificationResponseReceivedListener(() => {
+        setPendingReminder(true);
+        router.replace("/(tabs)");
       });
 
     return () => {

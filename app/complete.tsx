@@ -7,11 +7,11 @@ import BuddyCharacter from "@/components/BuddyCharacter";
 
 export default function CompleteScreen() {
   const router = useRouter();
-  const { steps } = useLocalSearchParams<{ steps: string }>();
+  const { steps, duration } = useLocalSearchParams<{ steps: string; duration: string }>();
   const sessionSteps = parseInt(steps ?? "0");
+  const sessionMins = Math.round(parseInt(duration ?? "60") / 60);
 
-  const { recordStandup, currentStreak, totalXP, totalStandups } =
-    useStatsStore();
+  const { recordStandup, addSessionSteps, totalStandups } = useStatsStore();
 
   const recorded = useRef(false);
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -21,22 +21,18 @@ export default function CompleteScreen() {
     if (!recorded.current) {
       recorded.current = true;
       recordStandup();
+      addSessionSteps(sessionSteps);
     }
 
     Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        bounciness: 10,
-        speed: 8,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, bounciness: 10, speed: 8 }),
+      Animated.timing(opacityAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
     ]).start();
   }, []);
+
+  const subtitle = sessionSteps > 0
+    ? `You completed ${sessionSteps.toLocaleString()} steps in this standup session!`
+    : "You completed a standup session!";
 
   return (
     <View className="flex-1 items-center justify-center bg-background px-6">
@@ -48,54 +44,40 @@ export default function CompleteScreen() {
           width: "100%",
         }}
       >
-        <Text className="text-4xl font-extrabold text-dark mb-1">
-          Great job! 🎉
-        </Text>
-        <Text className="text-gray-500 mb-8 text-center">
-          You completed a movement session
+        <Text className="text-4xl font-extrabold text-dark mb-2">Great job! 🎉</Text>
+        <Text className="text-base text-gray-500 mb-8 text-center leading-6">
+          {subtitle}
         </Text>
 
         <BuddyCharacter state="happy" size={200} />
 
-        {/* Stats row */}
-        <View className="flex-row gap-3 mt-8 mb-4 w-full">
-          <StatCard icon="flash" value="+10 XP" label="Earned" color="#43C6AC" />
-          <StatCard
-            icon="flame"
-            value={String(currentStreak)}
-            label="Day Streak"
-            color="#FF6B3D"
-          />
-          <StatCard
-            icon="fitness"
-            value={String(totalStandups)}
-            label="Total"
-            color="#6C63FF"
-          />
-        </View>
-
-        {/* Steps taken this session */}
-        {sessionSteps > 0 && (
+        {/* Sessions stat */}
+        <View
+          className="flex-row items-center gap-4 rounded-2xl px-6 py-4 mt-8 mb-6"
+          style={{
+            backgroundColor: "#FFFFFF",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.06,
+            shadowRadius: 6,
+            elevation: 2,
+            alignSelf: "stretch",
+          }}
+        >
           <View
-            className="w-full flex-row items-center gap-3 rounded-2xl px-4 py-3 mb-6"
-            style={{
-              backgroundColor: "rgba(67,198,172,0.1)",
-              borderWidth: 1,
-              borderColor: "rgba(67,198,172,0.25)",
-            }}
+            style={{ backgroundColor: "rgba(108,99,255,0.1)", borderRadius: 12, padding: 10 }}
           >
-            <Ionicons name="footsteps" size={22} color="#43C6AC" />
-            <View>
-              <Text
-                className="text-lg font-extrabold"
-                style={{ color: "#43C6AC" }}
-              >
-                {sessionSteps.toLocaleString()} steps
-              </Text>
-              <Text className="text-xs text-gray-500">taken this session</Text>
-            </View>
+            <Ionicons name="walk" size={24} color="#6C63FF" />
           </View>
-        )}
+          <View>
+            <Text style={{ fontSize: 22, fontWeight: "900", color: "#2D2D2D" }}>
+              {totalStandups} standup {totalStandups === 1 ? "session" : "sessions"}
+            </Text>
+            <Text style={{ fontSize: 13, color: "#999", fontWeight: "600", marginTop: 1 }}>
+              completed in total
+            </Text>
+          </View>
+        </View>
 
         <Pressable
           className="w-full py-4 rounded-2xl items-center"
@@ -105,36 +87,6 @@ export default function CompleteScreen() {
           <Text className="text-white text-lg font-semibold">Back to Home</Text>
         </Pressable>
       </Animated.View>
-    </View>
-  );
-}
-
-function StatCard({
-  icon,
-  value,
-  label,
-  color,
-}: {
-  icon: string;
-  value: string;
-  label: string;
-  color: string;
-}) {
-  return (
-    <View
-      className="flex-1 rounded-2xl p-4 items-center"
-      style={{
-        backgroundColor: "#FFFFFF",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
-        elevation: 2,
-      }}
-    >
-      <Ionicons name={icon as any} size={22} color={color} />
-      <Text className="text-xl font-extrabold text-dark mt-1">{value}</Text>
-      <Text className="text-xs text-gray-500">{label}</Text>
     </View>
   );
 }

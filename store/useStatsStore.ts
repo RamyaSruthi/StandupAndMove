@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-type DailyLog = Record<string, number>; // "YYYY-MM-DD" → standup count
+type DailyLog = Record<string, number>; // "YYYY-MM-DD" → count
 
 interface UserStats {
   currentStreak: number;
@@ -11,10 +11,14 @@ interface UserStats {
   totalXP: number;
   lastActiveDate: string | null;
   dailyLog: DailyLog;
+  stepsLog: DailyLog; // "YYYY-MM-DD" → steps from app sessions
 }
 
 interface StatsStore extends UserStats {
+  pendingReminder: boolean;
+  setPendingReminder: (val: boolean) => void;
   recordStandup: () => void;
+  addSessionSteps: (steps: number) => void;
   addXP: (amount: number) => void;
   resetStats: () => void;
 }
@@ -28,6 +32,7 @@ const defaultStats: UserStats = {
   totalXP: 0,
   lastActiveDate: null,
   dailyLog: {},
+  stepsLog: {},
 };
 
 function todayKey(): string {
@@ -47,14 +52,18 @@ export const useStatsStore = create<StatsStore>()(
   persist(
     (set, get) => ({
       ...defaultStats,
+      pendingReminder: false,
+      setPendingReminder: (val) => set({ pendingReminder: val }),
 
       recordStandup: () => {
         const state = get();
         const today = todayKey();
-        const dailyLog = { ...state.dailyLog, [today]: (state.dailyLog[today] ?? 0) + 1 };
+        const dailyLog = {
+          ...state.dailyLog,
+          [today]: (state.dailyLog[today] ?? 0) + 1,
+        };
 
         let currentStreak = state.currentStreak;
-
         if (state.lastActiveDate === today) {
           // Already active today — streak unchanged
         } else if (state.lastActiveDate && isYesterday(state.lastActiveDate)) {
@@ -73,6 +82,17 @@ export const useStatsStore = create<StatsStore>()(
           totalStandups: state.totalStandups + 1,
           totalXP: state.totalXP + XP_PER_STANDUP,
         });
+      },
+
+      addSessionSteps: (steps: number) => {
+        if (steps <= 0) return;
+        const today = todayKey();
+        set((state) => ({
+          stepsLog: {
+            ...state.stepsLog,
+            [today]: (state.stepsLog[today] ?? 0) + steps,
+          },
+        }));
       },
 
       addXP: (amount) =>

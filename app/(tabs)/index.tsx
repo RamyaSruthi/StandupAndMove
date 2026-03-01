@@ -1,100 +1,138 @@
-import { ScrollView, View, Text } from "react-native";
+import { View, Text, Pressable, Animated, StatusBar } from "react-native";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Ionicons } from "@expo/vector-icons";
+import { useState, useRef } from "react";
+import { Svg, Circle } from "react-native-svg";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useStatsStore } from "@/store/useStatsStore";
-import { GreetingHeader } from "@/components/GreetingHeader";
-import { BuddyMascot } from "@/components/BuddyMascot";
-import { MoodBar } from "@/components/MoodBar";
-import { MovingButton } from "@/components/MovingButton";
 import { DurationPicker } from "@/components/DurationPicker";
-import { useDailySteps } from "@/hooks/useDailySteps";
+import BuddyCharacter from "@/components/BuddyCharacter";
 import type { BuddyState } from "@/components/BuddyCharacter";
+
+const RING_SIZE = 260;
+const RADIUS = 115;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 function todayKey() {
   return new Date().toISOString().split("T")[0];
 }
 
-const MESSAGES: Record<BuddyState, string> = {
-  happy: "You're crushing it today! 🔥",
-  neutral: "Let's get moving!",
-  lazy: "I'm getting sleepy... wake me up! 😴",
+const STATE_LABEL: Record<BuddyState, string> = {
+  happy: "Happy & energetic! 🔥",
+  neutral: "Ready to move",
+  lazy: "Getting sleepy... 😴",
 };
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const buddyName = useSettingsStore((s) => s.buddyName);
-  const { currentStreak, totalXP, dailyLog } = useStatsStore();
-  const { steps, available: stepsAvailable } = useDailySteps();
-  const [showPicker, setShowPicker] = useState(false);
+  const { dailyLog, stepsLog, pendingReminder, setPendingReminder } = useStatsStore();
 
-  const standupsToday = dailyLog[todayKey()] ?? 0;
+  const todayStandups = dailyLog[todayKey()] ?? 0;
+  const todaySteps = stepsLog[todayKey()] ?? 0;
+
+  const [showPicker, setShowPicker] = useState(false);
+  const scale = useRef(new Animated.Value(1)).current;
 
   const buddyState: BuddyState =
-    standupsToday >= 2 ? "happy" : standupsToday >= 1 ? "neutral" : "lazy";
+    todayStandups >= 2 ? "happy" : todayStandups >= 1 ? "neutral" : "lazy";
 
-  const moodProgress = Math.min(Math.round((standupsToday / 3) * 100), 100);
+  const displayState: BuddyState = pendingReminder ? "lazy" : buddyState;
+  const moodProgress = Math.min(todayStandups / 3, 1);
+  const strokeDashoffset = CIRCUMFERENCE * (1 - moodProgress);
+
+  const handleTap = () => {
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 1.1, useNativeDriver: true, speed: 50, bounciness: 8 }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 4 }),
+    ]).start();
+  };
 
   const handleDurationSelected = (seconds: number) => {
+    setPendingReminder(false);
     setShowPicker(false);
     router.push({ pathname: "/timer", params: { duration: String(seconds) } });
   };
 
   return (
     <>
-      <ScrollView
-        className="flex-1 bg-background"
-        contentContainerStyle={{ paddingBottom: 20 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <GreetingHeader name={buddyName} streak={currentStreak} />
+      <StatusBar barStyle="light-content" />
+      <View style={{ flex: 1, backgroundColor: "#6C63FF" }}>
 
-        <BuddyMascot
-          state={buddyState}
-          message={MESSAGES[buddyState]}
-          buddyName={buddyName}
-        />
+        {/* Greeting */}
+        <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 24 }}>
+          <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 15, fontWeight: "600" }}>
+            Hey, {buddyName} 👋
+          </Text>
+        </View>
 
-        <MoodBar
-          progress={moodProgress}
-          standupsToday={standupsToday}
-          totalXP={totalXP}
-        />
+        {/* Buddy + ring + stats — all on purple */}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28 }}>
+          {/* Ring + character */}
+          <View style={{ width: RING_SIZE, height: RING_SIZE, alignItems: "center", justifyContent: "center" }}>
+            <Svg width={RING_SIZE} height={RING_SIZE} style={{ position: "absolute" }}>
+              <Circle
+                cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RADIUS}
+                fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={14}
+              />
+              <Circle
+                cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RADIUS}
+                fill="none" stroke="white" strokeWidth={14}
+                strokeLinecap="round"
+                strokeDasharray={CIRCUMFERENCE}
+                strokeDashoffset={strokeDashoffset}
+                transform={`rotate(-90, ${RING_SIZE / 2}, ${RING_SIZE / 2})`}
+              />
+            </Svg>
 
-        {/* Daily steps card */}
-        {stepsAvailable && (
-          <View className="px-6 mt-3">
-            <View
-              className="bg-white rounded-2xl px-4 py-3 flex-row items-center gap-3"
-              style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
-                shadowRadius: 6,
-                elevation: 2,
-              }}
-            >
-              <View
-                className="w-9 h-9 rounded-full items-center justify-center"
-                style={{ backgroundColor: "rgba(67,198,172,0.12)" }}
-              >
-                <Ionicons name="footsteps" size={18} color="#43C6AC" />
-              </View>
-              <View>
-                <Text className="text-base font-extrabold text-dark">
-                  {steps.toLocaleString()} steps
-                </Text>
-                <Text className="text-xs text-gray-500">
-                  walked by standing up today
-                </Text>
-              </View>
-            </View>
+            <Pressable onPress={handleTap} accessibilityLabel="Tap Buddy">
+              <Animated.View style={{ transform: [{ scale }] }}>
+                <BuddyCharacter state={displayState} size={200} />
+              </Animated.View>
+            </Pressable>
           </View>
-        )}
 
-        <MovingButton onPress={() => setShowPicker(true)} />
-      </ScrollView>
+          {/* Mood label pill */}
+          <View style={{
+            backgroundColor: pendingReminder ? "rgba(255,101,132,0.85)" : "rgba(255,255,255,0.18)",
+            borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6, marginTop: 12,
+          }}>
+            <Text style={{ color: "white", fontSize: 13, fontWeight: "700" }}>
+              {pendingReminder ? "Buddy needs a walk with you! 🐾" : STATE_LABEL[buddyState]}
+            </Text>
+          </View>
+
+          {/* Steps count */}
+          <Text style={{ color: "white", fontSize: 56, fontWeight: "900", marginTop: 20, lineHeight: 60 }}>
+            {todaySteps.toLocaleString()}
+          </Text>
+          <Text style={{ color: "rgba(255,255,255,0.65)", fontSize: 15, fontWeight: "600", marginTop: 4 }}>
+            {todayStandups > 0
+              ? `steps across ${todayStandups} move ${todayStandups === 1 ? "session" : "sessions"} today`
+              : "Start your first move session!"}
+          </Text>
+        </View>
+
+        {/* Button */}
+        <View style={{ paddingHorizontal: 28, paddingBottom: insets.bottom + 130 }}>
+          <Pressable
+            onPress={() => setShowPicker(true)}
+            style={{
+              backgroundColor: "white",
+              borderRadius: 18, paddingVertical: 18,
+              alignItems: "center",
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.15,
+              shadowRadius: 16,
+              elevation: 8,
+            }}
+          >
+            <Text style={{ color: "#6C63FF", fontSize: 17, fontWeight: "800" }}>I'm Moving! 🏃</Text>
+          </Pressable>
+        </View>
+      </View>
 
       <DurationPicker
         visible={showPicker}

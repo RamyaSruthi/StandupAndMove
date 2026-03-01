@@ -3,7 +3,6 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Svg, Circle } from "react-native-svg";
 import { Pedometer } from "expo-sensors";
-import { Ionicons } from "@expo/vector-icons";
 import BuddyCharacter from "@/components/BuddyCharacter";
 
 const RADIUS = 100;
@@ -16,10 +15,12 @@ export default function TimerScreen() {
 
   const [secondsLeft, setSecondsLeft] = useState(DURATION);
   const [sessionSteps, setSessionSteps] = useState(0);
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pedometerRef = useRef<ReturnType<typeof Pedometer.watchStepCount> | null>(null);
+  const stepsRef = useRef(0);
 
-  // Countdown
+  // Countdown ticker
   useEffect(() => {
     intervalRef.current = setInterval(() => {
       setSecondsLeft((prev) => {
@@ -30,38 +31,33 @@ export default function TimerScreen() {
         return prev - 1;
       });
     }, 1000);
-
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
 
-  // Navigate when timer reaches zero
+  // Navigate when timer hits zero
   useEffect(() => {
-    if (secondsLeft === 0) {
-      navigate();
-    }
+    if (secondsLeft === 0) navigate();
   }, [secondsLeft]);
 
-  // Session step counter
+  // Pedometer — update display immediately on every batch
   useEffect(() => {
     Pedometer.isAvailableAsync().then((available) => {
       if (!available) return;
       pedometerRef.current = Pedometer.watchStepCount((result) => {
+        stepsRef.current = result.steps;
         setSessionSteps(result.steps);
       });
     });
-
-    return () => {
-      pedometerRef.current?.remove();
-    };
+    return () => { pedometerRef.current?.remove(); };
   }, []);
 
   const navigate = () => {
     pedometerRef.current?.remove();
     router.replace({
       pathname: "/complete",
-      params: { steps: String(sessionSteps) },
+      params: { steps: String(stepsRef.current), duration: String(DURATION) },
     });
   };
 
@@ -79,11 +75,9 @@ export default function TimerScreen() {
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   const timeLabel = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-
   const progress = secondsLeft / DURATION;
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
-  const ringColor =
-    progress > 0.5 ? "#6C63FF" : progress > 0.25 ? "#43C6AC" : "#FF6584";
+  const ringColor = progress > 0.5 ? "#6C63FF" : progress > 0.25 ? "#43C6AC" : "#FF6584";
 
   return (
     <View className="flex-1 items-center justify-center bg-background px-6">
@@ -91,21 +85,10 @@ export default function TimerScreen() {
         Keep Moving!
       </Text>
 
-      {/* Circular progress ring with Buddy inside */}
-      <View
-        style={{
-          width: 240,
-          height: 240,
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: 32,
-        }}
-      >
+      {/* Ring + Buddy */}
+      <View style={{ width: 240, height: 240, alignItems: "center", justifyContent: "center", marginBottom: 32 }}>
         <Svg width={240} height={240} style={{ position: "absolute" }}>
-          <Circle
-            cx={120} cy={120} r={RADIUS}
-            fill="none" stroke="#EEEEEE" strokeWidth={12}
-          />
+          <Circle cx={120} cy={120} r={RADIUS} fill="none" stroke="#EEEEEE" strokeWidth={12} />
           <Circle
             cx={120} cy={120} r={RADIUS}
             fill="none" stroke={ringColor} strokeWidth={12}
@@ -115,30 +98,13 @@ export default function TimerScreen() {
             transform={`rotate(-90, 120, 120)`}
           />
         </Svg>
-
         <View className="items-center">
           <BuddyCharacter state="happy" size={140} />
-          <Text
-            className="text-3xl font-extrabold mt-1"
-            style={{ color: ringColor }}
-          >
+          <Text className="text-3xl font-extrabold mt-1" style={{ color: ringColor }}>
             {timeLabel}
           </Text>
         </View>
       </View>
-
-      {/* Session steps */}
-      {sessionSteps > 0 && (
-        <View
-          className="flex-row items-center gap-2 rounded-full px-4 py-2 mb-6"
-          style={{ backgroundColor: "rgba(67,198,172,0.12)" }}
-        >
-          <Ionicons name="footsteps" size={16} color="#43C6AC" />
-          <Text className="text-sm font-semibold" style={{ color: "#43C6AC" }}>
-            {sessionSteps} steps so far
-          </Text>
-        </View>
-      )}
 
       <Pressable
         className="w-full py-4 rounded-2xl items-center mb-3"
